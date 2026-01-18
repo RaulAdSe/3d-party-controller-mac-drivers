@@ -10,6 +10,10 @@ let package = Package(
         .executable(
             name: "bigben-mapper",
             targets: ["BigbenMapper"]
+        ),
+        .executable(
+            name: "gamepad-tester",
+            targets: ["GamepadTester"]
         )
     ],
     dependencies: [],
@@ -29,7 +33,7 @@ let package = Package(
                 .unsafeFlags(["-L/opt/homebrew/lib"])
             ]
         ),
-        // Main Swift executable
+        // Main Swift executable (keyboard/mouse mapper)
         .executableTarget(
             name: "BigbenMapper",
             dependencies: ["CUSBController"],
@@ -40,7 +44,8 @@ let package = Package(
                 "Views",
                 "Services/ControllerMonitor.swift",
                 "Services/DriverManager.swift",
-                "CUSBController"
+                "CUSBController",
+                "GamepadTester"
             ],
             sources: [
                 "main.swift",
@@ -50,7 +55,19 @@ let package = Package(
             linkerSettings: [
                 .linkedFramework("IOKit"),
                 .linkedFramework("CoreGraphics"),
-                .linkedFramework("AppKit")
+                .linkedFramework("AppKit"),
+                .linkedFramework("CoreVideo")
+            ]
+        ),
+        // Gamepad Tester GUI app
+        .executableTarget(
+            name: "GamepadTester",
+            dependencies: ["CUSBController"],
+            path: "BigbenControllerApp/Sources/GamepadTester",
+            linkerSettings: [
+                .linkedFramework("IOKit"),
+                .linkedFramework("AppKit"),
+                .linkedFramework("SwiftUI")
             ]
         )
     ]
