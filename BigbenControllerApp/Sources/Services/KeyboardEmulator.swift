@@ -9,6 +9,7 @@
 import Foundation
 import CoreGraphics
 import AppKit
+import CoreVideo
 
 // MARK: - Key Mapping Configuration
 
@@ -27,10 +28,10 @@ struct KeyMapping: Codable, Equatable {
     var buttonR3: UInt16 = CGKeyCode.keyV          // V (Melee)
     var buttonHome: UInt16 = 0                     // Disabled
 
-    var dpadUp: UInt16 = CGKeyCode.key1            // 1 (Weapon slot)
-    var dpadDown: UInt16 = CGKeyCode.key2          // 2
-    var dpadLeft: UInt16 = CGKeyCode.key3          // 3
-    var dpadRight: UInt16 = CGKeyCode.key4         // 4
+    var dpadUp: UInt16 = CGKeyCode.upArrow         // Up Arrow
+    var dpadDown: UInt16 = CGKeyCode.downArrow     // Down Arrow
+    var dpadLeft: UInt16 = CGKeyCode.leftArrow     // Left Arrow
+    var dpadRight: UInt16 = CGKeyCode.rightArrow   // Right Arrow
 
     // Movement keys
     var moveForward: UInt16 = CGKeyCode.keyW
@@ -39,8 +40,10 @@ struct KeyMapping: Codable, Equatable {
     var moveRight: UInt16 = CGKeyCode.keyD
 
     // Mouse sensitivity (pixels per full stick deflection per update)
-    var mouseSensitivity: Double = 15.0
-    var mouseDeadzone: Double = 0.15
+    var mouseSensitivity: Double = 25.0            // Reduced from 35.0 for better control with new response curve
+    var mouseDeadzone: Double = 0.15               // Inner deadzone to ignore stick drift (reduced from 0.18)
+    var mouseOuterDeadzone: Double = 0.95          // Outer deadzone to prevent edge instability
+    var mouseAcceleration: Double = 2.0            // Legacy: kept for compatibility, multi-stage curve used instead
 
     static let `default` = KeyMapping()
 
@@ -96,6 +99,12 @@ extension CGKeyCode {
     static let leftControl: UInt16 = 0x3B
     static let leftAlt: UInt16 = 0x3A
 
+    // Arrow keys
+    static let upArrow: UInt16 = 0x7E
+    static let downArrow: UInt16 = 0x7D
+    static let leftArrow: UInt16 = 0x7B
+    static let rightArrow: UInt16 = 0x7C
+
     // Special codes for mouse buttons (handled separately)
     static let mouseLeft: UInt16 = 0xF0
     static let mouseRight: UInt16 = 0xF1
@@ -112,6 +121,80 @@ class KeyboardEmulator {
     private var pressedKeys = Set<UInt16>()
     private var mouseButtonsPressed = Set<UInt16>()
     private var lastState = ControllerState()
+
+    // VSync-aligned mouse movement via CVDisplayLink
+    private var displayLink: CVDisplayLink?
+    private var pendingDeltaX: Double = 0
+    private var pendingDeltaY: Double = 0
+    private let mouseLock = NSLock()
+
+    // Smoothing disabled for immediate response (was 0.3, now 0.0)
+    private let smoothingFactor: Double = 0.0
+
+    // MARK: - Initialization
+
+    init() {
+        setupDisplayLink()
+    }
+
+    private func setupDisplayLink() {
+        var displayLinkRef: CVDisplayLink?
+        let status = CVDisplayLinkCreateWithActiveCGDisplays(&displayLinkRef)
+
+        guard status == kCVReturnSuccess, let link = displayLinkRef else {
+            print("Failed to create CVDisplayLink, falling back to immediate updates")
+            return
+        }
+
+        displayLink = link
+
+        // Set up the callback
+        let callback: CVDisplayLinkOutputCallback = { (displayLink, inNow, inOutputTime, flagsIn, flagsOut, context) -> CVReturn in
+            guard let context = context else { return kCVReturnSuccess }
+            let emulator = Unmanaged<KeyboardEmulator>.fromOpaque(context).takeUnretainedValue()
+            emulator.flushMouseMovement()
+            return kCVReturnSuccess
+        }
+
+        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+        CVDisplayLinkSetOutputCallback(link, callback, selfPtr)
+        CVDisplayLinkStart(link)
+    }
+
+    // Called at VSync rate to flush accumulated mouse movement
+    private func flushMouseMovement() {
+        mouseLock.lock()
+        let deltaX = pendingDeltaX
+        let deltaY = pendingDeltaY
+        pendingDeltaX = 0
+        pendingDeltaY = 0
+        mouseLock.unlock()
+
+        guard abs(deltaX) > 0.1 || abs(deltaY) > 0.1 else { return }
+
+        // Use delta-based mouse movement via CGEventPost for smooth, low-latency movement
+        postMouseMovement(deltaX: deltaX, deltaY: deltaY)
+    }
+
+    // Post mouse movement using CGEvent with delta values (much smoother than CGWarpMouseCursorPosition)
+    private func postMouseMovement(deltaX: Double, deltaY: Double) {
+        // Get current mouse position for the event
+        let mouseLocation = NSEvent.mouseLocation
+        let screenHeight = NSScreen.main?.frame.height ?? 1080
+        let point = CGPoint(x: mouseLocation.x, y: screenHeight - mouseLocation.y)
+
+        // Create mouse moved event with delta values
+        guard let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left) else {
+            return
+        }
+
+        // Set the delta values - this is what makes movement smooth like a real mouse
+        event.setIntegerValueField(.mouseEventDeltaX, value: Int64(deltaX.rounded()))
+        event.setIntegerValueField(.mouseEventDeltaY, value: Int64(deltaY.rounded()))
+
+        // Post to HID event tap for lowest latency
+        event.post(tap: .cghidEventTap)
+    }
 
     // MARK: - Process Controller State
 
@@ -291,25 +374,66 @@ class KeyboardEmulator {
         let x = normalizeAxis(state.rightStickX)
         let y = normalizeAxis(state.rightStickY)
 
-        // Apply deadzone
-        let adjustedX = applyDeadzone(x, mapping.mouseDeadzone)
-        let adjustedY = applyDeadzone(y, mapping.mouseDeadzone)
+        // Apply dual deadzone (inner and outer)
+        let adjustedX = applyDualDeadzone(x, inner: mapping.mouseDeadzone, outer: mapping.mouseOuterDeadzone)
+        var adjustedY = applyDualDeadzone(y, inner: mapping.mouseDeadzone, outer: mapping.mouseOuterDeadzone)
 
-        guard adjustedX != 0 || adjustedY != 0 else { return }
+        // INVERT Y AXIS (fix for inverted camera)
+        adjustedY = -adjustedY
 
-        // Calculate mouse movement
-        let deltaX = adjustedX * mapping.mouseSensitivity
-        let deltaY = adjustedY * mapping.mouseSensitivity
+        // Apply multi-stage response curve for better control
+        // 0-40%: Precision zone (power 0.7) - fine aiming
+        // 40-80%: Linear zone (power 1.0) - consistent movement
+        // 80-100%: Acceleration zone (power 1.3) - fast turns
+        let curvedX = applyMultiStageAcceleration(adjustedX)
+        let curvedY = applyMultiStageAcceleration(adjustedY)
 
-        // Move mouse
-        let mouseLocation = NSEvent.mouseLocation
-        let screenHeight = NSScreen.main?.frame.height ?? 1080
-        let newX = mouseLocation.x + deltaX
-        let newY = screenHeight - mouseLocation.y + deltaY
+        // Calculate target mouse movement
+        let targetX = curvedX * mapping.mouseSensitivity
+        let targetY = curvedY * mapping.mouseSensitivity
 
-        if let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: CGPoint(x: newX, y: newY), mouseButton: .left) {
-            event.post(tap: .cghidEventTap)
+        // Skip if no movement
+        guard abs(targetX) > 0.1 || abs(targetY) > 0.1 else { return }
+
+        // Accumulate delta for VSync-aligned updates
+        if displayLink != nil {
+            mouseLock.lock()
+            pendingDeltaX += targetX
+            pendingDeltaY += targetY
+            mouseLock.unlock()
+        } else {
+            // Fallback: immediate update if CVDisplayLink not available
+            postMouseMovement(deltaX: targetX, deltaY: targetY)
         }
+    }
+
+    // Multi-stage response curve for natural joystick-to-mouse feel
+    // Zone 1 (0-40%): Precision - power 0.7 for fine aiming
+    // Zone 2 (40-80%): Linear - power 1.0 for consistent tracking
+    // Zone 3 (80-100%): Acceleration - power 1.3 for fast turns
+    private func applyMultiStageAcceleration(_ value: Double) -> Double {
+        let sign = value >= 0 ? 1.0 : -1.0
+        let magnitude = abs(value)
+
+        let result: Double
+        if magnitude <= 0.4 {
+            // Precision zone: power 0.7 for fine control
+            // Normalize to 0-1 within this zone, apply curve, scale back
+            let normalized = magnitude / 0.4
+            result = pow(normalized, 0.7) * 0.4
+        } else if magnitude <= 0.8 {
+            // Linear zone: power 1.0 (no curve)
+            // Start from where precision zone ended (0.4)
+            let normalized = (magnitude - 0.4) / 0.4
+            result = 0.4 + normalized * 0.4
+        } else {
+            // Acceleration zone: power 1.3 for fast turns
+            // Start from where linear zone ended (0.8)
+            let normalized = (magnitude - 0.8) / 0.2
+            result = 0.8 + pow(normalized, 1.3) * 0.2
+        }
+
+        return sign * result
     }
 
     // MARK: - Helpers
@@ -318,6 +442,26 @@ class KeyboardEmulator {
         return (Double(value) - 128.0) / 128.0
     }
 
+    // Dual deadzone: inner removes drift, outer prevents edge instability
+    private func applyDualDeadzone(_ value: Double, inner: Double, outer: Double) -> Double {
+        let magnitude = abs(value)
+
+        // Inner deadzone: eliminate stick drift
+        if magnitude < inner {
+            return 0
+        }
+
+        // Outer deadzone: clamp to max at threshold to prevent instability at edges
+        let clampedMagnitude = min(magnitude, outer)
+
+        // Scale to 0-1 range between inner and outer deadzone
+        let sign = value > 0 ? 1.0 : -1.0
+        let scaledMagnitude = (clampedMagnitude - inner) / (outer - inner)
+
+        return sign * scaledMagnitude
+    }
+
+    // Legacy single deadzone for left stick (movement keys don't need precision)
     private func applyDeadzone(_ value: Double, _ deadzone: Double) -> Double {
         if abs(value) < deadzone {
             return 0
@@ -343,6 +487,12 @@ class KeyboardEmulator {
     }
 
     deinit {
+        // Stop and release CVDisplayLink
+        if let link = displayLink {
+            CVDisplayLinkStop(link)
+        }
+        displayLink = nil
+
         releaseAllKeys()
     }
 }

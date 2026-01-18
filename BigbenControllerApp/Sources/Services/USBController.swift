@@ -87,9 +87,10 @@ class USBControllerReader {
     var onDisconnected: (() -> Void)?
 
     private var controller: OpaquePointer?
-    private var readTimer: Timer?
+    private var readTimer: DispatchSourceTimer?
     private var currentState = ControllerState()
     private var isRunning = false
+    private let pollQueue = DispatchQueue(label: "com.bigben.poll", qos: .userInteractive)
 
     init() {
         // Initialize libusb
@@ -123,7 +124,7 @@ class USBControllerReader {
 
     func stop() {
         isRunning = false
-        readTimer?.invalidate()
+        readTimer?.cancel()
         readTimer = nil
 
         if let ctrl = controller {
@@ -162,13 +163,17 @@ class USBControllerReader {
     }
 
     private func startReading() {
-        // Poll for input in a timer on the main thread
-        // This is simpler than using background threads for the Swift callback integration
-        readTimer?.invalidate()
-        readTimer = Timer.scheduledTimer(withTimeInterval: 1.0/120.0, repeats: true) { [weak self] _ in
+        // Poll for input at high frequency for smooth mouse movement
+        // 500Hz = 2ms intervals for very responsive camera control
+        readTimer?.cancel()
+
+        let timer = DispatchSource.makeTimerSource(queue: pollQueue)
+        timer.schedule(deadline: .now(), repeating: .milliseconds(2), leeway: .microseconds(100))
+        timer.setEventHandler { [weak self] in
             self?.pollController()
         }
-        RunLoop.main.add(readTimer!, forMode: .common)
+        timer.resume()
+        readTimer = timer
     }
 
     private func pollController() {
@@ -186,7 +191,7 @@ class USBControllerReader {
             }
         } else if result == -4 { // LIBUSB_ERROR_NO_DEVICE
             // Device disconnected
-            readTimer?.invalidate()
+            readTimer?.cancel()
             readTimer = nil
 
             DispatchQueue.main.async { [weak self] in
