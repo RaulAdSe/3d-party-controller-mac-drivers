@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Bundle Identification -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+
+    <!-- App Configuration -->
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
+    <key>LSUIElement</key>
+    <true/>
+
+    <!-- System Extension Configuration -->
+    <key>NSSystemExtensionUsageDescription</key>
+    <string>Bigben Controller App needs to install a driver extension to communicate with your game controller.</string>
+
+    <!-- Human Interface -->
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright 2024. MIT License.</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSMainStoryboardFile</key>
+    <string></string>
+
+    <!-- High Resolution Support -->
+    <key>NSHighResolutionCapable</key>
+    <true/>
+
+    <!-- Supported Platforms -->
+    <key>LSArchitecturePriority</key>
+    <array>
+        <string>arm64</string>
+        <string>x86_64</string>
+    </array>
+
+    <!-- URL Schemes (for future deep linking) -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.bigben.controllerapp</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>bigbencontroller</string>
+            </array>
+        </dict>
+    </array>
+
+    <!-- Application supports secure coding -->
+    <key>NSSupportsSecureState</key>
+    <true/>
+
+    <!-- Privacy descriptions -->
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Bigben Controller App may use Bluetooth for future wireless controller support.</string>
+
+    <!-- Hardened Runtime -->
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Bigben Controller App may need to communicate with other applications.</string>
+
+    <!-- Service Management for Login Item -->
+    <key>SMPrivilegedExecutables</key>
+    <dict/>
+
+    <!-- Application Services -->
+    <key>NSServices</key>
+    <array/>
+
+    <!-- Driver Extension Information -->
+    <key>BigbenDriverExtensionIdentifier</key>
+    <string>com.bigben.controllerdriver</string>
+
+    <!-- Supported Controllers -->
+    <key>BigbenSupportedControllers</key>
+    <array>
+        <dict>
+            <key>Name</key>
+            <string>Bigben PC Compact Controller</string>
+            <key>VendorID</key>
+            <integer>5227</integer>
+            <key>ProductID</key>
+            <integer>1539</integer>
+        </dict>
+        <dict>
+            <key>Name</key>
+            <string>Bigben PS4 Compact Controller</string>
+            <key>VendorID</key>
+            <integer>5227</integer>
+            <key>ProductID</key>
+            <integer>3333</integer>
+        </dict>
+        <dict>
+            <key>Name</key>
+            <string>Bigben PS3 Mini Pad</string>
+            <key>VendorID</key>
+            <integer>5227</integer>
+            <key>ProductID</key>
+            <integer>2306</integer>
+        </dict>
+    </array>
+</dict>
+</plist>
