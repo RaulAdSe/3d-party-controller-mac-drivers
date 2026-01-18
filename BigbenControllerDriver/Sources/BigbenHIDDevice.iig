@@ -1,0 +1,198 @@
+//
+//  BigbenHIDDevice.iig
+//  BigbenControllerDriver
+//
+//  DriverKit interface for the Bigben virtual HID gamepad device.
+//  This class presents a standard HID gamepad to macOS while receiving
+//  translated input from the USB driver component.
+//
+//  Copyright (c) 2024. Licensed under MIT License.
+//
+
+#ifndef BigbenHIDDevice_h
+#define BigbenHIDDevice_h
+
+#include <Availability.h>
+#include <DriverKit/IOService.iig>
+#include <HIDDriverKit/IOUserHIDDevice.iig>
+
+// Forward declarations
+class BigbenUSBDriver;
+class OSData;
+class OSDictionary;
+class IOMemoryDescriptor;
+
+// =============================================================================
+// MARK: - BigbenHIDDevice Class
+// =============================================================================
+
+/*!
+ * @class BigbenHIDDevice
+ * @abstract Virtual HID gamepad device for Bigben controllers
+ * @discussion This class inherits from IOUserHIDDevice and presents a standard
+ *             HID gamepad interface to macOS. It receives proprietary input data
+ *             from the USB driver and translates it to standard HID reports.
+ *
+ *             The device exposes:
+ *             - 16 buttons
+ *             - 2 analog sticks (X/Y, Rx/Ry)
+ *             - 2 analog triggers (Z/Rz)
+ *             - 1 hat switch (D-pad)
+ */
+class LOCALONLY BigbenHIDDevice : public IOUserHIDDevice
+{
+public:
+    // =========================================================================
+    // MARK: - Lifecycle Methods
+    // =========================================================================
+
+    /*!
+     * @function init
+     * @abstract Initialize the HID device instance
+     * @return True if initialization succeeded
+     */
+    virtual bool init() override;
+
+    /*!
+     * @function free
+     * @abstract Release resources held by the HID device
+     */
+    virtual void free() override;
+
+    /*!
+     * @function Start
+     * @abstract Start the HID device service
+     * @param provider The provider service (USB driver)
+     * @return kIOReturnSuccess on success
+     */
+    virtual kern_return_t Start(IOService* provider) override;
+
+    /*!
+     * @function Stop
+     * @abstract Stop the HID device service
+     * @param provider The provider service
+     * @return kIOReturnSuccess on success
+     */
+    virtual kern_return_t Stop(IOService* provider) override;
+
+    // =========================================================================
+    // MARK: - HID Device Description
+    // =========================================================================
+
+    /*!
+     * @function newDeviceDescription
+     * @abstract Create the device description dictionary
+     * @discussion Returns a dictionary containing device properties:
+     *             - VendorID
+     *             - ProductID
+     *             - Product name
+     *             - Transport type
+     *             - Serial number
+     * @return Device description dictionary (caller must release)
+     */
+    virtual OSDictionary* newDeviceDescription() override;
+
+    /*!
+     * @function newReportDescriptor
+     * @abstract Create the HID report descriptor
+     * @discussion Returns the standard HID gamepad report descriptor
+     *             defined in Shared/HIDReportDescriptor.h
+     * @return HID report descriptor data (caller must release)
+     */
+    virtual OSData* newReportDescriptor() override;
+
+    // =========================================================================
+    // MARK: - Report Handling
+    // =========================================================================
+
+    /*!
+     * @function getReport
+     * @abstract Handle GET_REPORT requests from host
+     * @param report Memory descriptor to fill with report data
+     * @param reportType The type of report requested
+     * @param options Additional options
+     * @param completionTimeout Timeout in milliseconds
+     * @param action Completion action
+     * @return kIOReturnSuccess on success
+     */
+    virtual kern_return_t getReport(IOMemoryDescriptor*      report,
+                                    IOHIDReportType          reportType,
+                                    IOOptionBits             options,
+                                    uint32_t                 completionTimeout,
+                                    OSAction*                action) override;
+
+    /*!
+     * @function setReport
+     * @abstract Handle SET_REPORT requests from host (rumble, LEDs)
+     * @param report Memory descriptor containing report data
+     * @param reportType The type of report
+     * @param options Additional options
+     * @param completionTimeout Timeout in milliseconds
+     * @param action Completion action
+     * @return kIOReturnSuccess on success
+     */
+    virtual kern_return_t setReport(IOMemoryDescriptor*      report,
+                                    IOHIDReportType          reportType,
+                                    IOOptionBits             options,
+                                    uint32_t                 completionTimeout,
+                                    OSAction*                action) override;
+
+    // =========================================================================
+    // MARK: - Input Processing
+    // =========================================================================
+
+    /*!
+     * @function handleInputReport
+     * @abstract Process incoming input report from USB driver
+     * @discussion Receives proprietary BigbenInputReport data from the USB driver,
+     *             translates it to standard BigbenHIDReport format, and dispatches
+     *             to macOS via handleReport().
+     * @param inputData Pointer to BigbenInputReport structure
+     * @param length Size of the input data
+     * @return kIOReturnSuccess on success
+     */
+    virtual kern_return_t handleInputReport(const void* inputData, uint32_t length);
+
+    // =========================================================================
+    // MARK: - USB Driver Communication
+    // =========================================================================
+
+    /*!
+     * @function setUSBDriver
+     * @abstract Set reference to the USB driver for output reports
+     * @param driver The USB driver instance
+     */
+    virtual void setUSBDriver(BigbenUSBDriver* driver);
+
+    /*!
+     * @function sendRumbleToUSB
+     * @abstract Send rumble command to USB driver
+     * @param leftMotor Left motor intensity (0-255)
+     * @param rightMotor Right motor on/off
+     * @return kIOReturnSuccess on success
+     */
+    virtual kern_return_t sendRumbleToUSB(uint8_t leftMotor, uint8_t rightMotor);
+
+    /*!
+     * @function sendLEDToUSB
+     * @abstract Send LED state to USB driver
+     * @param ledMask LED bitmask
+     * @return kIOReturnSuccess on success
+     */
+    virtual kern_return_t sendLEDToUSB(uint8_t ledMask);
+
+private:
+    // =========================================================================
+    // MARK: - Private Members
+    // =========================================================================
+
+    struct BigbenHIDDevice_IVars
+    {
+        BigbenUSBDriver*    usbDriver;          // Reference to USB driver
+        IOMemoryDescriptor* reportDescriptor;    // Cached report descriptor
+        uint8_t             currentLEDState;     // Current LED state
+        bool                isStarted;           // Service started flag
+    } *ivars;
+};
+
+#endif /* BigbenHIDDevice_h */
