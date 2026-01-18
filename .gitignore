@@ -1,0 +1,14 @@
+# Build artifacts
+.build/
+*.o
+usb_test
+DerivedData/
+*.xcuserdata
+
+# macOS
+.DS_Store
+*.swp
+
+# IDE
+.idea/
+*.xcworkspace
