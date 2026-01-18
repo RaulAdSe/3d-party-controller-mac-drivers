@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        Bigben Controller App Entitlements
+
+        These entitlements are required for:
+        1. Installing and managing the DriverKit system extension
+        2. Running with hardened runtime for distribution
+        3. Accessing USB devices through IOKit
+    -->
+
+    <!-- System Extension Installation -->
+    <!-- Required to install, activate, and deactivate system extensions -->
+    <key>com.apple.developer.system-extension.install</key>
+    <true/>
+
+    <!-- Hardened Runtime -->
+    <!-- Required for notarization and distribution outside Mac App Store -->
+    <key>com.apple.security.app-sandbox</key>
+    <false/>
+
+    <!-- Allow unsigned executable memory (if needed for IOKit callbacks) -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <false/>
+
+    <!-- Allow DYLD environment variables (for debugging) -->
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <false/>
+
+    <!-- Disable library validation -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <false/>
+
+    <!-- Disable executable memory protection (not needed) -->
+    <key>com.apple.security.cs.disable-executable-page-protection</key>
+    <false/>
+
+    <!-- Allow JIT (not needed for this app) -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <false/>
+
+    <!-- Debugger entitlement (for development builds only) -->
+    <key>com.apple.security.get-task-allow</key>
+    <false/>
+
+    <!--
+        Note: The following entitlements may be needed for specific features:
+
+        For USB device access (if direct HID access is needed):
+        <key>com.apple.developer.driverkit.userclient-access</key>
+        <array>
+            <string>com.bigben.controllerdriver</string>
+        </array>
+
+        For future features like reading controller configurations:
+        <key>com.apple.security.files.user-selected.read-write</key>
+        <true/>
+
+        For future Bluetooth controller support:
+        <key>com.apple.security.device.bluetooth</key>
+        <true/>
+    -->
+
+    <!-- Team ID Association (filled by Xcode) -->
+    <!-- <key>com.apple.developer.team-identifier</key> -->
+    <!-- <string>$(TeamIdentifierPrefix)</string> -->
+
+    <!-- Application Groups (for sharing data with driver, if needed) -->
+    <!--
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>$(TeamIdentifierPrefix)com.bigben.controller</string>
+    </array>
+    -->
+</dict>
+</plist>
