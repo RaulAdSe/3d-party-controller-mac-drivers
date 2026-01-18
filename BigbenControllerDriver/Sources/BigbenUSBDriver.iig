@@ -1,0 +1,220 @@
+//
+//  BigbenUSBDriver.iig
+//  BigbenControllerDriver
+//
+//  DriverKit interface for Bigben Interactive USB game controllers.
+//  Handles USB communication and input report parsing for the Bigben
+//  PC Compact Controller (VID: 0x146b, PID: 0x0603).
+//
+
+#ifndef BigbenUSBDriver_h
+#define BigbenUSBDriver_h
+
+#include <Availability.h>
+#include <DriverKit/IOService.iig>
+#include <DriverKit/IOMemoryDescriptor.iig>
+#include <DriverKit/IOBufferMemoryDescriptor.iig>
+#include <DriverKit/IOTimerDispatchSource.iig>
+#include <USBDriverKit/IOUSBHostDevice.iig>
+#include <USBDriverKit/IOUSBHostInterface.iig>
+#include <USBDriverKit/IOUSBHostPipe.iig>
+#include <HIDDriverKit/IOUserUSBHostHIDDevice.iig>
+
+// =============================================================================
+// MARK: - BigbenUSBDriver Class
+// =============================================================================
+
+/*!
+ * @class BigbenUSBDriver
+ * @abstract DriverKit USB driver for Bigben Interactive game controllers.
+ * @discussion This driver matches Bigben controllers via USB VID/PID,
+ *             opens USB endpoints, receives input reports, parses the
+ *             proprietary input format, and forwards data to the HID layer.
+ */
+class LOCALONLY BigbenUSBDriver : public IOUserUSBHostHIDDevice
+{
+public:
+    // =========================================================================
+    // MARK: - IOService Lifecycle
+    // =========================================================================
+
+    /*!
+     * @brief Initialize the driver instance.
+     * @return true if initialization succeeded, false otherwise.
+     */
+    virtual bool init() override;
+
+    /*!
+     * @brief Clean up driver resources.
+     */
+    virtual void free() override;
+
+    /*!
+     * @brief Start the driver with the given provider.
+     * @param provider The IOService provider (IOUSBHostInterface).
+     * @return kIOReturnSuccess on success, appropriate error code otherwise.
+     */
+    virtual kern_return_t Start(IOService *provider) override;
+
+    /*!
+     * @brief Stop the driver and release resources.
+     * @param provider The IOService provider.
+     * @return kIOReturnSuccess on success.
+     */
+    virtual kern_return_t Stop(IOService *provider) override;
+
+    // =========================================================================
+    // MARK: - IOUserUSBHostHIDDevice Overrides
+    // =========================================================================
+
+    /*!
+     * @brief Provide the HID report descriptor for this device.
+     * @param descriptor Output parameter for the descriptor memory.
+     * @return kIOReturnSuccess on success.
+     */
+    virtual kern_return_t getHIDDescriptor(IOMemoryDescriptor **descriptor) override;
+
+    /*!
+     * @brief Handle incoming HID reports from the device.
+     * @param timestamp The timestamp of the report.
+     * @param report The report data memory descriptor.
+     * @param reportLength The length of the report.
+     * @param type The report type (input, output, feature).
+     * @param reportID The report ID.
+     * @return kIOReturnSuccess on success.
+     */
+    virtual kern_return_t handleReport(
+        uint64_t timestamp,
+        IOMemoryDescriptor *report,
+        uint32_t reportLength,
+        IOHIDReportType type,
+        IOOptionBits options
+    ) override;
+
+    /*!
+     * @brief Set an output or feature report on the device.
+     * @param report The report data memory descriptor.
+     * @param reportType The report type (output or feature).
+     * @param options Additional options.
+     * @return kIOReturnSuccess on success.
+     */
+    virtual kern_return_t setReport(
+        IOMemoryDescriptor *report,
+        IOHIDReportType reportType,
+        IOOptionBits options
+    ) override;
+
+    /*!
+     * @brief Get a report from the device.
+     * @param report The output buffer for the report.
+     * @param reportType The report type to retrieve.
+     * @param options Additional options.
+     * @return kIOReturnSuccess on success.
+     */
+    virtual kern_return_t getReport(
+        IOMemoryDescriptor *report,
+        IOHIDReportType reportType,
+        IOOptionBits options
+    ) override;
+
+    // =========================================================================
+    // MARK: - USB Endpoint Handling
+    // =========================================================================
+
+    /*!
+     * @brief Callback for completed async read operations on interrupt IN endpoint.
+     * @param action The completion action context.
+     * @param status The completion status.
+     * @param actualByteCount The actual number of bytes transferred.
+     */
+    virtual void ReadComplete(
+        OSAction *action,
+        IOReturn status,
+        uint32_t actualByteCount
+    ) TYPE(IOUSBHostPipe::CompleteAsyncIO);
+
+    /*!
+     * @brief Callback for completed async write operations on interrupt OUT endpoint.
+     * @param action The completion action context.
+     * @param status The completion status.
+     * @param actualByteCount The actual number of bytes transferred.
+     */
+    virtual void WriteComplete(
+        OSAction *action,
+        IOReturn status,
+        uint32_t actualByteCount
+    ) TYPE(IOUSBHostPipe::CompleteAsyncIO);
+
+private:
+    // =========================================================================
+    // MARK: - Private Methods (LOCALONLY)
+    // =========================================================================
+
+    /*!
+     * @brief Configure USB interface and endpoints.
+     * @return kIOReturnSuccess on success.
+     */
+    kern_return_t ConfigureDevice();
+
+    /*!
+     * @brief Open the USB interface.
+     * @return kIOReturnSuccess on success.
+     */
+    kern_return_t OpenInterface();
+
+    /*!
+     * @brief Set up the interrupt IN endpoint for input reports.
+     * @return kIOReturnSuccess on success.
+     */
+    kern_return_t SetupInterruptInEndpoint();
+
+    /*!
+     * @brief Set up the interrupt OUT endpoint for output reports.
+     * @return kIOReturnSuccess on success.
+     */
+    kern_return_t SetupInterruptOutEndpoint();
+
+    /*!
+     * @brief Start asynchronous reads from the interrupt IN endpoint.
+     * @return kIOReturnSuccess on success.
+     */
+    kern_return_t StartInputPolling();
+
+    /*!
+     * @brief Stop asynchronous reads from the interrupt IN endpoint.
+     */
+    void StopInputPolling();
+
+    /*!
+     * @brief Parse a raw input report from the controller.
+     * @param data Pointer to the raw report data.
+     * @param length Length of the report data.
+     */
+    void ParseInputReport(const uint8_t *data, size_t length);
+
+    /*!
+     * @brief Send an output report to the controller (LED/rumble).
+     * @param data Pointer to the output report data.
+     * @param length Length of the output report.
+     * @return kIOReturnSuccess on success.
+     */
+    kern_return_t SendOutputReport(const uint8_t *data, size_t length);
+
+    /*!
+     * @brief Log controller state for debugging.
+     */
+    void LogControllerState();
+
+    /*!
+     * @brief Generate the HID report descriptor for gamepad emulation.
+     * @return kIOReturnSuccess on success.
+     */
+    kern_return_t CreateHIDReportDescriptor();
+
+    /*!
+     * @brief Clean up allocated resources.
+     */
+    void CleanupResources();
+};
+
+#endif /* BigbenUSBDriver_h */

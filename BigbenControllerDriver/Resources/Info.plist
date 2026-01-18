@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- ======================================================================
+         Bundle Identification
+         ====================================================================== -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+
+    <key>CFBundleName</key>
+    <string>BigbenControllerDriver</string>
+
+    <key>CFBundleDisplayName</key>
+    <string>Bigben Controller Driver</string>
+
+    <key>CFBundlePackageType</key>
+    <string>DEXT</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+
+    <key>CFBundleVersion</key>
+    <string>1</string>
+
+    <!-- ======================================================================
+         DriverKit Configuration
+         ====================================================================== -->
+    <key>OSBundleUsageDescription</key>
+    <string>This driver extension provides support for Bigben Interactive game controllers on macOS.</string>
+
+    <!-- ======================================================================
+         IOKit Personalities - Device Matching
+         ====================================================================== -->
+    <key>IOKitPersonalities</key>
+    <dict>
+        <!-- Primary match: Bigben PC Compact Controller (XInput mode) -->
+        <key>BigbenPCCompactController</key>
+        <dict>
+            <key>CFBundleIdentifier</key>
+            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+
+            <key>CFBundleIdentifierKernel</key>
+            <string>com.apple.kpi.iokit</string>
+
+            <key>IOClass</key>
+            <string>IOUserService</string>
+
+            <key>IOProviderClass</key>
+            <string>IOUSBHostInterface</string>
+
+            <key>IOUserClass</key>
+            <string>BigbenUSBDriver</string>
+
+            <key>IOUserServerName</key>
+            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+
+            <!-- USB Device Matching -->
+            <key>idVendor</key>
+            <integer>5227</integer>  <!-- 0x146b -->
+
+            <key>idProduct</key>
+            <integer>1539</integer>  <!-- 0x0603 -->
+
+            <!-- Match any interface (typically interface 0) -->
+            <key>bInterfaceClass</key>
+            <integer>255</integer>   <!-- 0xFF - Vendor Specific -->
+
+            <key>bInterfaceSubClass</key>
+            <integer>93</integer>    <!-- 0x5D - XInput -->
+
+            <key>bInterfaceProtocol</key>
+            <integer>1</integer>     <!-- 0x01 -->
+
+            <!-- IOKit Matching Priority -->
+            <key>IOProbeScore</key>
+            <integer>90000</integer>
+
+            <!-- Human-readable device name -->
+            <key>IOUserServerCDHash</key>
+            <string></string>
+
+            <!-- Support for device attach/detach -->
+            <key>IOMatchDefer</key>
+            <false/>
+        </dict>
+
+        <!-- Secondary match: Bigben PS4 Compact Controller -->
+        <key>BigbenPS4CompactController</key>
+        <dict>
+            <key>CFBundleIdentifier</key>
+            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+
+            <key>CFBundleIdentifierKernel</key>
+            <string>com.apple.kpi.iokit</string>
+
+            <key>IOClass</key>
+            <string>IOUserService</string>
+
+            <key>IOProviderClass</key>
+            <string>IOUSBHostInterface</string>
+
+            <key>IOUserClass</key>
+            <string>BigbenUSBDriver</string>
+
+            <key>IOUserServerName</key>
+            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+
+            <!-- USB Device Matching -->
+            <key>idVendor</key>
+            <integer>5227</integer>  <!-- 0x146b -->
+
+            <key>idProduct</key>
+            <integer>3333</integer>  <!-- 0x0d05 -->
+
+            <!-- Match HID interface -->
+            <key>bInterfaceClass</key>
+            <integer>3</integer>     <!-- HID Class -->
+
+            <!-- IOKit Matching Priority -->
+            <key>IOProbeScore</key>
+            <integer>90000</integer>
+
+            <key>IOMatchDefer</key>
+            <false/>
+        </dict>
+
+        <!-- Tertiary match: Bigben PS3 Minipad -->
+        <key>BigbenPS3Minipad</key>
+        <dict>
+            <key>CFBundleIdentifier</key>
+            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+
+            <key>CFBundleIdentifierKernel</key>
+            <string>com.apple.kpi.iokit</string>
+
+            <key>IOClass</key>
+            <string>IOUserService</string>
+
+            <key>IOProviderClass</key>
+            <string>IOUSBHostInterface</string>
+
+            <key>IOUserClass</key>
+            <string>BigbenUSBDriver</string>
+
+            <key>IOUserServerName</key>
+            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+
+            <!-- USB Device Matching -->
+            <key>idVendor</key>
+            <integer>5227</integer>  <!-- 0x146b -->
+
+            <key>idProduct</key>
+            <integer>2306</integer>  <!-- 0x0902 -->
+
+            <!-- Match HID interface -->
+            <key>bInterfaceClass</key>
+            <integer>3</integer>     <!-- HID Class -->
+
+            <!-- IOKit Matching Priority -->
+            <key>IOProbeScore</key>
+            <integer>90000</integer>
+
+            <key>IOMatchDefer</key>
+            <false/>
+        </dict>
+    </dict>
+
+    <!-- ======================================================================
+         System Extension Configuration
+         ====================================================================== -->
+    <key>OSBundleLibraries</key>
+    <dict>
+        <key>com.apple.kpi.iokit</key>
+        <string>21.0</string>
+
+        <key>com.apple.kpi.driverkit</key>
+        <string>21.0</string>
+
+        <key>com.apple.kpi.usb</key>
+        <string>21.0</string>
+    </dict>
+
+    <!-- ======================================================================
+         Required System Capabilities
+         ====================================================================== -->
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+
+    <!-- ======================================================================
+         Privacy and User Consent
+         ====================================================================== -->
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright 2024. All rights reserved.</string>
+</dict>
+</plist>

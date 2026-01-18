@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- ======================================================================
+         DriverKit Core Entitlement
+         ======================================================================
+         Required for all DriverKit extensions. This is the fundamental
+         entitlement that enables the extension to run as a driver.
+    -->
+    <key>com.apple.developer.driverkit</key>
+    <true/>
+
+    <!-- ======================================================================
+         USB Transport Entitlement
+         ======================================================================
+         Required for drivers that communicate with USB devices.
+         Enables access to IOUSBHostDevice, IOUSBHostInterface, and
+         IOUSBHostPipe APIs.
+    -->
+    <key>com.apple.developer.driverkit.transport.usb</key>
+    <true/>
+
+    <!-- ======================================================================
+         HID Family Entitlement
+         ======================================================================
+         Required for drivers that present themselves as HID devices.
+         Enables the use of IOUserHIDDevice, IOUserUSBHostHIDDevice,
+         and related HID APIs.
+    -->
+    <key>com.apple.developer.driverkit.family.hid.device</key>
+    <true/>
+
+    <!-- ======================================================================
+         USB Device Allow List
+         ======================================================================
+         Specifies which USB devices this driver is allowed to access.
+         Each entry contains the vendor ID and product ID of a supported
+         device. This is a security feature to limit driver access.
+    -->
+    <key>com.apple.developer.driverkit.usb.device.allow</key>
+    <array>
+        <!-- Bigben PC Compact Controller (XInput mode) -->
+        <dict>
+            <key>idVendor</key>
+            <integer>5227</integer>  <!-- 0x146b -->
+            <key>idProduct</key>
+            <integer>1539</integer>  <!-- 0x0603 -->
+        </dict>
+        <!-- Bigben PS4 Compact Controller -->
+        <dict>
+            <key>idVendor</key>
+            <integer>5227</integer>  <!-- 0x146b -->
+            <key>idProduct</key>
+            <integer>3333</integer>  <!-- 0x0d05 -->
+        </dict>
+        <!-- Bigben PS3 Minipad -->
+        <dict>
+            <key>idVendor</key>
+            <integer>5227</integer>  <!-- 0x146b -->
+            <key>idProduct</key>
+            <integer>2306</integer>  <!-- 0x0902 -->
+        </dict>
+    </array>
+
+    <!-- ======================================================================
+         Communication with Host Application (Optional)
+         ======================================================================
+         If the driver needs to communicate with a host application via
+         user clients, uncomment this entitlement.
+    -->
+    <!--
+    <key>com.apple.developer.driverkit.allow-any-userclient-access</key>
+    <true/>
+    -->
+
+    <!-- ======================================================================
+         Memory Mapping Entitlement (Optional)
+         ======================================================================
+         Required if the driver needs to map memory for DMA or shared
+         memory with user space clients.
+    -->
+    <!--
+    <key>com.apple.developer.driverkit.allow-third-party-userclients</key>
+    <true/>
+    -->
+
+    <!-- ======================================================================
+         Hardened Runtime (For Notarization)
+         ======================================================================
+         These entitlements support notarization requirements while
+         maintaining security.
+    -->
+
+    <!-- Allow unsigned executable memory (required for some DriverKit operations) -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+
+    <!-- Disable library validation (required for loading DriverKit extensions) -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>
