@@ -128,8 +128,10 @@ class KeyboardEmulator {
     private var pendingDeltaY: Double = 0
     private let mouseLock = NSLock()
 
-    // Smoothing disabled for immediate response (was 0.3, now 0.0)
-    private let smoothingFactor: Double = 0.0
+    // Light smoothing to reduce jitter (0.0 = none, 0.3 = heavy)
+    private let smoothingFactor: Double = 0.15
+    private var smoothX: Double = 0
+    private var smoothY: Double = 0
 
     // MARK: - Initialization
 
@@ -176,24 +178,25 @@ class KeyboardEmulator {
         postMouseMovement(deltaX: deltaX, deltaY: deltaY)
     }
 
-    // Post mouse movement using CGEvent with delta values (much smoother than CGWarpMouseCursorPosition)
+    // Post mouse movement
     private func postMouseMovement(deltaX: Double, deltaY: Double) {
-        // Get current mouse position for the event
         let mouseLocation = NSEvent.mouseLocation
         let screenHeight = NSScreen.main?.frame.height ?? 1080
-        let point = CGPoint(x: mouseLocation.x, y: screenHeight - mouseLocation.y)
+        let screenWidth = NSScreen.main?.frame.width ?? 1920
 
-        // Create mouse moved event with delta values
-        guard let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left) else {
-            return
+        // Calculate new position
+        let cgY = screenHeight - mouseLocation.y
+        let newX = max(0, min(screenWidth, mouseLocation.x + deltaX))
+        let newY = max(0, min(screenHeight, cgY + deltaY))
+        let newPoint = CGPoint(x: newX, y: newY)
+
+        // Move cursor
+        CGWarpMouseCursorPosition(newPoint)
+
+        // Also post a mouse moved event so games see it
+        if let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: newPoint, mouseButton: .left) {
+            event.post(tap: .cghidEventTap)
         }
-
-        // Set the delta values - this is what makes movement smooth like a real mouse
-        event.setIntegerValueField(.mouseEventDeltaX, value: Int64(deltaX.rounded()))
-        event.setIntegerValueField(.mouseEventDeltaY, value: Int64(deltaY.rounded()))
-
-        // Post to HID event tap for lowest latency
-        event.post(tap: .cghidEventTap)
     }
 
     // MARK: - Process Controller State
@@ -341,14 +344,14 @@ class KeyboardEmulator {
         let x = normalizeAxis(state.leftStickX)
         let y = normalizeAxis(state.leftStickY)
 
-        // Forward/backward
-        if y < -mapping.mouseDeadzone {
+        // Forward/backward (Y axis: positive = forward, negative = backward)
+        if y > mapping.mouseDeadzone {
             pressKey(mapping.moveForward)
         } else {
             releaseKey(mapping.moveForward)
         }
 
-        if y > mapping.mouseDeadzone {
+        if y < -mapping.mouseDeadzone {
             pressKey(mapping.moveBackward)
         } else {
             releaseKey(mapping.moveBackward)
@@ -376,15 +379,9 @@ class KeyboardEmulator {
 
         // Apply dual deadzone (inner and outer)
         let adjustedX = applyDualDeadzone(x, inner: mapping.mouseDeadzone, outer: mapping.mouseOuterDeadzone)
-        var adjustedY = applyDualDeadzone(y, inner: mapping.mouseDeadzone, outer: mapping.mouseOuterDeadzone)
-
-        // INVERT Y AXIS (fix for inverted camera)
-        adjustedY = -adjustedY
+        let adjustedY = applyDualDeadzone(y, inner: mapping.mouseDeadzone, outer: mapping.mouseOuterDeadzone)
 
         // Apply multi-stage response curve for better control
-        // 0-40%: Precision zone (power 0.7) - fine aiming
-        // 40-80%: Linear zone (power 1.0) - consistent movement
-        // 80-100%: Acceleration zone (power 1.3) - fast turns
         let curvedX = applyMultiStageAcceleration(adjustedX)
         let curvedY = applyMultiStageAcceleration(adjustedY)
 
@@ -392,19 +389,19 @@ class KeyboardEmulator {
         let targetX = curvedX * mapping.mouseSensitivity
         let targetY = curvedY * mapping.mouseSensitivity
 
-        // Skip if no movement
-        guard abs(targetX) > 0.1 || abs(targetY) > 0.1 else { return }
+        // Apply smoothing to reduce jitter
+        smoothX = smoothX * smoothingFactor + targetX * (1.0 - smoothingFactor)
+        smoothY = smoothY * smoothingFactor + targetY * (1.0 - smoothingFactor)
 
-        // Accumulate delta for VSync-aligned updates
-        if displayLink != nil {
-            mouseLock.lock()
-            pendingDeltaX += targetX
-            pendingDeltaY += targetY
-            mouseLock.unlock()
-        } else {
-            // Fallback: immediate update if CVDisplayLink not available
-            postMouseMovement(deltaX: targetX, deltaY: targetY)
+        // Skip if no significant movement
+        guard abs(smoothX) > 0.5 || abs(smoothY) > 0.5 else {
+            smoothX = 0
+            smoothY = 0
+            return
         }
+
+        // Post mouse movement
+        postMouseMovement(deltaX: smoothX, deltaY: smoothY)
     }
 
     // Multi-stage response curve for natural joystick-to-mouse feel
