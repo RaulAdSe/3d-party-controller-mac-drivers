@@ -15,9 +15,9 @@ import CoreVideo
 
 struct KeyMapping: Codable, Equatable {
     var buttonA: UInt16 = CGKeyCode.space          // Space (Jump)
-    var buttonB: UInt16 = CGKeyCode.keyC           // C (Crouch)
-    var buttonX: UInt16 = CGKeyCode.keyR           // R (Reload)
-    var buttonY: UInt16 = CGKeyCode.keyF           // F (Use)
+    var buttonB: UInt16 = CGKeyCode.keyV           // V (Melee)
+    var buttonX: UInt16 = CGKeyCode.keyR           // R (Reload) + F (Action)
+    var buttonY: UInt16 = CGKeyCode.key1           // 1 (Switch weapon)
     var buttonLB: UInt16 = CGKeyCode.keyQ          // Q (Lean Left)
     var buttonRB: UInt16 = CGKeyCode.keyE          // E (Lean Right)
     var buttonLT: UInt16 = CGKeyCode.mouseLeft     // Left Click (ADS)
@@ -105,6 +105,9 @@ extension CGKeyCode {
     static let leftArrow: UInt16 = 0x7B
     static let rightArrow: UInt16 = 0x7C
 
+    // Other keys
+    static let returnKey: UInt16 = 0x24
+
     // Special codes for mouse buttons (handled separately)
     static let mouseLeft: UInt16 = 0xF0
     static let mouseRight: UInt16 = 0xF1
@@ -129,7 +132,7 @@ class KeyboardEmulator {
     private let mouseLock = NSLock()
 
     // Light smoothing to reduce jitter (0.0 = none, 0.3 = heavy)
-    private let smoothingFactor: Double = 0.15
+    private let smoothingFactor: Double = 0.25
     private var smoothX: Double = 0
     private var smoothY: Double = 0
 
@@ -206,8 +209,10 @@ class KeyboardEmulator {
 
         // Handle buttons
         processButton(state.buttonA, lastState.buttonA, mapping.buttonA)
+        processButton(state.buttonA, lastState.buttonA, CGKeyCode.returnKey)  // Cross also presses Enter (accept)
         processButton(state.buttonB, lastState.buttonB, mapping.buttonB)
         processButton(state.buttonX, lastState.buttonX, mapping.buttonX)
+        processButton(state.buttonX, lastState.buttonX, CGKeyCode.keyF)       // Square also presses F (Action)
         processButton(state.buttonY, lastState.buttonY, mapping.buttonY)
         processButton(state.buttonLB, lastState.buttonLB, mapping.buttonLB)
         processButton(state.buttonRB, lastState.buttonRB, mapping.buttonRB)
